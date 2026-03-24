@@ -19,7 +19,12 @@ contract VehicleInspection {
         Inspection[] inspections;
     }
 
-    mapping(string => Vehicle) private vehicles;
+    // usar hash como key
+    mapping(bytes32 => Vehicle) private vehicles;
+
+    // =========================
+    // UTILIDADES
+    // =========================
 
     function toUpper(string memory str) internal pure returns (string memory) {
         bytes memory b = bytes(str);
@@ -31,17 +36,24 @@ contract VehicleInspection {
         return string(b);
     }
 
+    function toKey(string memory plate) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(toUpper(plate)));
+    }
+
     function isValidPlate(string memory plate) internal pure returns (bool) {
         bytes memory b = bytes(plate);
         if (b.length != 6) return false;
+
         // AAA
         for (uint i = 0; i < 3; i++) {
             if (!(b[i] >= 0x41 && b[i] <= 0x5A)) return false;
         }
+
         // 000
         for (uint i = 3; i < 6; i++) {
             if (!(b[i] >= 0x30 && b[i] <= 0x39)) return false;
         }
+
         return true;
     }
 
@@ -51,12 +63,12 @@ contract VehicleInspection {
         uint _opacity
     ) internal pure returns (bool) {
 
-        // Simplificación tipo gasolina moderna
+        // Gasolina
         if (_co <= 50 && _hc <= 200) {
             return true;
         }
 
-        // Simplificación diésel
+        // Diésel
         if (_opacity <= 4500) {
             return true;
         }
@@ -64,11 +76,21 @@ contract VehicleInspection {
         return false;
     }
 
+    // =========================
+    // FUNCIONES PRINCIPALES
+    // =========================
+
     function registerVehicle(string memory _plate, VehicleType _vType) public {
         string memory normalizedPlate = toUpper(_plate);
         require(isValidPlate(normalizedPlate), "Formato invalido");
-        vehicles[normalizedPlate].plate = normalizedPlate;
-        vehicles[normalizedPlate].vType = _vType;
+
+        bytes32 key = toKey(normalizedPlate);
+
+        // Evitar sobrescribir vehículo existente
+        require(bytes(vehicles[key].plate).length == 0, "Vehiculo ya existe");
+
+        vehicles[key].plate = normalizedPlate;
+        vehicles[key].vType = _vType;
     }
 
     function addInspection(
@@ -80,9 +102,11 @@ contract VehicleInspection {
     ) public {
 
         string memory normalizedPlate = toUpper(_plate);
-
         require(isValidPlate(normalizedPlate), "Formato invalido");
-        require(bytes(vehicles[normalizedPlate].plate).length != 0, "Vehiculo no existe");
+
+        bytes32 key = toKey(normalizedPlate);
+
+        require(bytes(vehicles[key].plate).length != 0, "Vehiculo no existe");
 
         require(_co <= 1000, "CO invalido");
         require(_hc <= 2000, "HC invalido");
@@ -90,21 +114,32 @@ contract VehicleInspection {
 
         bool approved = isApproved(_co, _hc, _opacity);
 
-        vehicles[normalizedPlate].inspections.push(
+        vehicles[key].inspections.push(
             Inspection(_date, _co, _hc, _opacity, approved)
         );
     }
 
     function getInspectionCount(string memory _plate) public view returns (uint) {
         string memory normalizedPlate = toUpper(_plate);
-        return vehicles[normalizedPlate].inspections.length;
+        require(isValidPlate(normalizedPlate), "Formato invalido");
+
+        bytes32 key = toKey(normalizedPlate);
+
+        return vehicles[key].inspections.length;
     }
 
     function getInspection(string memory _plate, uint index)
         public view returns (uint, uint, uint, uint, bool)
     {
         string memory normalizedPlate = toUpper(_plate);
-        Inspection memory i = vehicles[normalizedPlate].inspections[index];
+        require(isValidPlate(normalizedPlate), "Formato invalido");
+
+        bytes32 key = toKey(normalizedPlate);
+
+        require(index < vehicles[key].inspections.length, "Indice fuera de rango");
+
+        Inspection memory i = vehicles[key].inspections[index];
+
         return (i.date, i.co, i.hc, i.opacity, i.approved);
     }
 }
