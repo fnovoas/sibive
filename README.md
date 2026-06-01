@@ -1,109 +1,174 @@
-# **Sistema Blockchain para Inspección de Vehículos (SiBIVe)**
+# Sistema Blockchain para Inspección de Vehículos (SiBIVe)
 
-Laboratorio de blockchain de Ciberseguridad (2026-1) por fnovoas.  
-Este proyecto implementa una DApp para el registro y seguimiento de inspecciones vehiculares utilizando una blockchain privada basada en Ethereum (Geth).  
+Proyecto del curso de Ciberseguridad (2026-1) basado en el laboratorio de blockchain, por fnovoas.
 
-Incluye:
+DApp para el registro y seguimiento de inspecciones vehiculares sobre una blockchain privada Ethereum (Geth). El entorno es autocontenido: ya no requiere MetaMask ni Remix.
 
-* Smart contract en Solidity.
-* Nodo Ethereum privado (Geth).
-* Backend en Flask (Web3.py).
-* Frontend en Next.js.
-* Contenedores Docker.
+## Componentes
 
-La dirección de la cuenta de prueba a usar actualmente es `0xe56826bf376b8df2d82119efbdbbbe70e031cca9`, y su clave es `b8f4e975d61ca406d2f04cbc709f822a7328cd59b3d2e8389a2e7d11428aefdf`, la cual conocemos gracias al script `extract_key.py`.
+| Capa | Tecnología |
+|------|------------|
+| Smart contract | Solidity (`VehicleInspection.sol`) |
+| Blockchain | Geth (Clique, red privada) |
+| Backend | Flask + Web3.py |
+| Frontend | Next.js |
+| Orquestación | Docker Compose + Makefile |
 
 ## Arquitectura
 
-Frontend (Next.js) → Backend (Flask) → Blockchain (Geth)
-
-## Ejecución rápida (DApp)
-Tener listo Remix y MetaMask. Clonar el repositorio a local y pararse en la carpeta.  
-
-```bash
-docker-compose up --build
+```
+Frontend (Next.js)  →  Backend (Flask)  →  Geth (blockchain local)
+     :3000                  :5000                 :8545
 ```
 
-* Frontend: http://localhost:3000
-* Backend: http://localhost:5000
+El backend:
 
-En otra terminal:  
+1. Despliega automáticamente el contrato al arrancar (`deploy.py`), usando `bytecode.txt` y `abi.json` precompilados (sin descargar compiladores en tiempo de ejecución).
+2. Guarda dirección y ABI en `sibive-backend/runtime/contract_info.json` (volumen persistente).
+3. Firma transacciones en memoria (`sign_transaction` + `send_raw_transaction`) con la cuenta de laboratorio; no usa MetaMask.
+
+Geth mina bloques al iniciar (`--mine` en `geth-node/start_geth_node.sh`).
+
+## Cuenta de laboratorio
+
+Solo para este entorno local controlado (sin valor real):
+
+| Campo | Valor |
+|-------|--------|
+| Dirección | `0xe56826bf376b8df2d82119efbdbbbe70e031cca9` |
+| Clave privada | ver `README` / script `extract_key.py` (keystore en `geth-node/data`) |
+| Chain ID (firma de transacciones) | `12345` (`genesis.json`) |
+| Network ID (Geth) | `23422` |
+
+El backend usa esta clave internamente. Geth desbloquea la misma cuenta solo para firmar bloques Clique (`--unlock` en el contenedor).
+
+## Requisitos
+
+- Docker y Docker Compose
+- Make
+- Puertos libres: `3000`, `5000`, `8545`
+
+## Ejecución rápida
+
+En la raíz del proyecto:
+
 ```bash
-sudo docker exec -it sibive_geth_1 geth attach /geth/data/geth.ipc
+make clean    # opcional: reinicio completo de cadena y contrato
+make build
 ```
 
-```bash
-miner.start()
-```
-
-Y ya podemos usar la aplicación. Para terminar:  
+Espera unos segundos a que el backend despliegue el contrato. Comprueba:
 
 ```bash
-exit
+curl http://127.0.0.1:5000/
+# → API SIBIVE funcionando
 ```
 
-## Configuración Blockchain (manual)
+Abre el frontend: **http://localhost:3000**
 
-### 1. Iniciar nodo Geth
+### Flujo en la aplicación
+
+1. **Registrar vehículo** — placa `AAA000` (3 letras + 3 números), tipo `0` (gasolina) o `1` (diésel).
+2. **Registrar inspección** — misma placa y valores de monóxido de carbono (CO), hidrocarburos (HC) y opacidad del humo.
+3. **Consultar historial** — introduce la placa y verifica las inspecciones guardadas.
+
+Si el vehículo ya existe en la cadena, el backend responde con un mensaje claro (no hace falta volver a registrarlo; pasa directo a inspección).
+
+## Comandos Makefile
+
+| Comando | Descripción |
+|---------|-------------|
+| `make build` | Construye imágenes y levanta servicios en segundo plano |
+| `make up` | Levanta servicios (sin reconstruir) |
+| `make down` | Detiene contenedores |
+| `make clean` | Detiene servicios, borra cadena local y `contract_info.json` |
+| `make mine` | Inicia el minero manualmente (opcional; Geth ya mina con `--mine`) |
+| `make stop-mine` | Detiene el minero |
+| `make logs` | Logs de todos los servicios |
+| `make logs-backend` | Logs del backend (despliegue, API, errores) |
+| `make compile-contract` | Recompila `bytecode.txt` y `abi.json` desde `VehicleInspection.sol` |
+
+## URLs
+
+- Frontend: http://localhost:3000  
+- Backend: http://localhost:5000  
+- Geth HTTP RPC: http://localhost:8545  
+
+## Archivos relevantes
+
+| Ruta | Uso |
+|------|-----|
+| `VehicleInspection.sol` | Contrato fuente |
+| `sibive-backend/bytecode.txt`, `abi.json` | Binario y ABI usados por `deploy.py` |
+| `sibive-backend/runtime/contract_info.json` | Dirección desplegada + ABI (generado al arrancar) |
+| `sibive-backend/runtime/app.log` | Registro de errores y eventos del backend |
+| `geth-node/data/` | Datos persistentes de la blockchain (bind mount) |
+
+Para regenerar bytecode/ABI tras cambiar el `.sol`:
+
+```bash
+make compile-contract
+make build
+```
+
+El bytecode debe compilarse con **EVM Paris** (sin opcode `PUSH0`). El target `compile-contract` ya usa `solc 0.8.19` con `--evm-version paris`.
+
+## Solución de problemas
+
+### 1. `make clean` no borra `geth-node/data/geth`
+
+Si antes usaste `sudo`, los archivos pueden ser de root:
+
+```bash
+sudo rm -rf geth-node/data/geth
+make clean
+make build
+```
+
+Evita `sudo make clean` en adelante; usa el mismo usuario que ejecuta Docker.
+
+Al ejecutar `make clean` (o `docker-compose`) con **`sudo`**, los archivos que se crean dentro de `geth-node/data/geth` —la base de datos de la blockchain en el host— quedan como **propiedad del usuario root**. El target `make clean` hace un `rm -rf geth-node/data/geth` sin `sudo`, así que el usuario normal no tiene permiso para borrarlos: el comando falla en silencio (en el Makefile está el `-` delante del `rm`, que ignora el error) o vemos “Permiso denegado”, y la cadena **sigue en disco**. Al hacer `make build`, Geth y el backend arrancan sobre esa blockchain antigua, con contratos y registros de pruebas anteriores, mientras que `contract_info.json` puede regenerarse o apuntar a otro contrato. Eso produce comportamientos confusos: placas “ya registradas”, nonces desfasados o historial vacío.
+
+La solución funciona porque **`sudo rm -rf geth-node/data/geth`** borra la carpeta con los permisos de root, dejando el directorio listo para que el siguiente `make clean` / `make build` (como usuario normal) cree una cadena nueva desde el `genesis.json`. A partir de ahí, conviene no usar **`sudo`** en make ni en `docker-compose` (el usuario debe estar en el grupo docker): así los archivos de `geth-node/data/` los crea el mismo usuario que luego puede borrarlos con `make clean`, y cada reinicio completo realmente empieza de cero.
+
+### 2. El backend no responde / Network Error en el navegador
+
+Comprueba que el contenedor esté en marcha:
+
+```bash
+docker-compose ps
+make logs-backend
+```
+
+Busca la línea `Contrato desplegado en: 0x...`. Si el backend sale con error, revisa `sibive-backend/runtime/app.log`.
+
+### 3. `nonce too low` o vehículo ya registrado
+
+La cadena conserva datos entre ejecuciones si no hiciste `make clean`. Usa otra placa o reinicia la cadena. Si la placa ya existe, registra solo la inspección.
+
+### 4. Consulta vacía tras registrar
+
+Suele deberse a un contrato distinto al de los registros (cadena antigua + `contract_info.json` nuevo). Ejecuta `make clean` y `make build` para alinear cadena y contrato.
+
+## Configuración manual (opcional)
+
+Para depurar Geth fuera de Docker:
 
 ```bash
 ./start_geth.sh
+# contraseña del keystore: 123
 ```
 
-En consola:  
-Ingresar la contraseña `123`.  
+En la consola de Geth: `miner.start()`. Este flujo es **opcional**; el stack Docker ya cubre el uso normal de la DApp.
 
-```javascript
-miner.start()
-```
-Para que empiece a minar continuamente y dejarlo así.  
-También podemos verificar que la cuenta tenga saldo con `eth.getBalance("DIRECCIÓN_DE_CUENTA")`, e ingresar repetidamente `eth.blockNumber` para verificar que la cantidad de bloques minados está aumentando constantemente después de haber empezado la minería.  
+## Notas de diseño
 
-### 2. Importar cuenta en MetaMask
+- `geth-node/data/` se excluye del contexto de build (`.dockerignore`) para no empaquetar la cadena en la imagen; los datos viven en el host vía volumen.
+- Las transacciones fallidas o revertidas no se reportan como éxito: el API valida el recibo on-chain y devuelve mensajes de error al frontend.
+- `make mine` sigue disponible por si detenemos el minero con `make stop-mine`; en el arranque normal no es obligatorio.
 
-* Abrir MetaMask (usé la extensión para Firefox en Ubuntu).  
-* Importar cuenta pegando su respectivo private key en texto plano. Para obtener la private key de una cuenta dada, usa el script `extract_key.py`.  
-* Configurar red (agregar red presonalizada):
+## Mejoras futuras
 
-```
-RPC URL: http://127.0.0.1:8545
-Chain ID: 12345
-Symbol: ETH
-```
-
-### 3. Desplegar contrato (Remix)
-
-* Abrir https://remix.ethereum.org  
-* Crear ahí el contrato `VehicleInspection.sol` (pegar el contenido del que está aquí).  
-* Compilar contrato (ver que la versión del compilador corresponda con la del contrato (0.8.0)).  
-* En Deploy & run transactions, en Environment seleccionar:  
-  → Injected Provider (MetaMask)
-* Deploy
-
-### 4. Copiar datos del contrato
-
-Actualizar manualmente estos archivos:
-
-* `sibive-backend/contract.py`: en Remix, Deployed Contracts (1), copiamos la dirección del contrato desplegado y la pegamos en la línea donde está la variable `contract_address`.  
-* `abi.json`: en Remix, Solidity compiler, Compilation Details, copiamos ABI y lo pegamos todo en este archivo.
-
-> En una red privada local de laboratorio con Geth es aceptable tener la dirección del contrato y el ABI “quemados” en el código fuente, porque no representan información sensible ni implican riesgos de seguridad reales. Son datos públicos por naturaleza en la blockchain: cualquier participante de la red puede consultarlos sin restricciones. El entorno es controlado y efímero (se reinicia con frecuencia, no está expuesto a internet y no maneja valor económico real), por lo que no existe un incentivo para ataques.  
-
-## Flujo de uso
-
-1. Registrar vehículo.  
-2. Registrar inspección.  
-3. Consultar historial de inspecciones.  
-
-## Notas
-
-* Es necesario que Geth esté minando (haber ejecutado `miner.start()`) para procesar transacciones, si no, las transacciones quedan en `pending...`.
-* MetaMask puede requerir reinicio si no detecta el balance (los 1000 ETH que asignamos desde el `genesis.json`). Puede hacer falta eliminar y volver a crear la cuenta y la red en MetaMask varias veces.  
-* Se excluye el directorio `geth-node/data/` mediante .dockerignore para evitar problemas de permisos y reducir el tamaño del contexto de construcción, ya que este contiene datos persistentes de la blockchain que no deben formar parte de la imagen.  
-
-## Posibles mejoras futuras
-
-* Automatizar despliegue del contrato (sin Remix).
-* Reemplazar MetaMask por gestión interna de claves.
-* Integrar Hardhat o Truffle.
-* Dashboard visual avanzado.
+- Integrar Hardhat o Foundry en el pipeline de compilación y pruebas.
+- Dashboard visual más completo.
+- Rotación o externalización de claves para entornos no locales.

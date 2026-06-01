@@ -1,8 +1,9 @@
 #!/bin/sh
 
-echo "Inicializando genesis..."
-
-geth --datadir /geth/data init /geth/genesis.json
+if [ ! -d /geth/data/geth/chaindata ]; then
+  echo "Inicializando genesis..."
+  geth --datadir /geth/data init /geth/genesis.json
+fi
 
 echo "Iniciando geth..."
 
@@ -18,5 +19,6 @@ exec geth \
   --unlock 0xe56826bf376b8df2d82119efbdbbbe70e031cca9 \
   --password /geth/password.txt \
   --allow-insecure-unlock \
+  --mine \
   --miner.etherbase 0xe56826bf376b8df2d82119efbdbbbe70e031cca9 \
   --nodiscover

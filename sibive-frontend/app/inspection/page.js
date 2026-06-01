@@ -11,9 +11,16 @@ export default function Inspection() {
   const [opacity, setOpacity] = useState("");
 
   const submit = async () => {
+    const plateRegex = /^[a-zA-Z]{3}[0-9]{3}$/;
+
+    if (!plateRegex.test(plate)) {
+      alert("La placa debe tener el formato AAA000 (3 letras y 3 números)");
+      return;
+    }
+
     try {
       await API.post("/inspection", {
-        plate,
+        plate: plate.trim().toUpperCase(),
         co: Number(co),
         hc: Number(hc),
         opacity: Number(opacity)
@@ -23,7 +30,7 @@ export default function Inspection() {
 
     } catch (err) {
       console.error(err);
-      alert("Error");
+      alert(err.response?.data?.error || "Error al registrar inspección");
     }
   };
 

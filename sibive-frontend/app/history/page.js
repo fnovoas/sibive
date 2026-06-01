@@ -15,7 +15,8 @@ export default function History() {
       setData(res.data);
     } catch (err) {
       console.error(err);
-      alert("Error al consultar");
+      alert(err.response?.data?.error || "Error al consultar");
+      setData([]);
     }
   };
 

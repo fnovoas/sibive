@@ -10,11 +10,19 @@ services:
       - ./geth-node/data:/geth/data
 
   backend:
-    build: ./sibive-backend
+    build:
+      context: .
+      dockerfile: ./sibive-backend/Dockerfile
     ports:
       - "5000:5000"
+    environment:
+      - CONTRACT_INFO_PATH=/app/runtime/contract_info.json
+      - LOG_DIR=/app/runtime
+    volumes:
+      - ./sibive-backend/runtime:/app/runtime
     depends_on:
       - geth
+    restart: unless-stopped
 
   frontend:
     build: ./sibive-frontend
@@ -22,5 +30,3 @@ services:
       - "3000:3000"
     depends_on:
       - backend
-
-      

@@ -28,7 +28,7 @@ export default function Register() {
 
     } catch (err) {
       console.error(err);
-      alert("Error al registrar");
+      alert(err.response?.data?.error || "Error al registrar");
     }
   };
 
