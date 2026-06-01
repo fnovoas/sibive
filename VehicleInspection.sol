@@ -21,6 +21,7 @@ contract VehicleInspection {
 
     // usar hash como key
     mapping(bytes32 => Vehicle) private vehicles;
+    string[] private registeredPlates;
 
     // =========================
     // UTILIDADES
@@ -58,19 +59,18 @@ contract VehicleInspection {
     }
 
     function isApproved(
+        VehicleType _vType,
         uint _co,
         uint _hc,
         uint _opacity
     ) internal pure returns (bool) {
 
-        // Gasolina
-        if (_co <= 50 && _hc <= 200) {
-            return true;
+        if (_vType == VehicleType.Gasoline) {
+            return _co <= 50 && _hc <= 200;
         }
 
-        // Diésel
-        if (_opacity <= 4500) {
-            return true;
+        if (_vType == VehicleType.Diesel) {
+            return _opacity <= 4500;
         }
 
         return false;
@@ -91,6 +91,7 @@ contract VehicleInspection {
 
         vehicles[key].plate = normalizedPlate;
         vehicles[key].vType = _vType;
+        registeredPlates.push(normalizedPlate);
     }
 
     function addInspection(
@@ -105,18 +106,44 @@ contract VehicleInspection {
         require(isValidPlate(normalizedPlate), "Formato invalido");
 
         bytes32 key = toKey(normalizedPlate);
+        Vehicle storage vehicle = vehicles[key];
 
-        require(bytes(vehicles[key].plate).length != 0, "Vehiculo no existe");
+        require(bytes(vehicle.plate).length != 0, "Vehiculo no existe");
 
-        require(_co <= 1000, "CO invalido");
-        require(_hc <= 2000, "HC invalido");
-        require(_opacity <= 10000, "Opacidad invalida");
+        if (vehicle.vType == VehicleType.Gasoline) {
+            require(_opacity == 0, "Opacidad no registrada para gasolina");
+            require(_co <= 1000, "CO invalido");
+            require(_hc <= 2000, "HC invalido");
+        } else {
+            require(_co == 0, "CO no registrado para diesel");
+            require(_hc == 0, "HC no registrado para diesel");
+            require(_opacity <= 10000, "Opacidad invalida");
+        }
 
-        bool approved = isApproved(_co, _hc, _opacity);
+        bool approved = isApproved(vehicle.vType, _co, _hc, _opacity);
 
-        vehicles[key].inspections.push(
+        vehicle.inspections.push(
             Inspection(_date, _co, _hc, _opacity, approved)
         );
+    }
+
+    function getRegisteredVehicleCount() public view returns (uint) {
+        return registeredPlates.length;
+    }
+
+    function getRegisteredPlate(uint index) public view returns (string memory) {
+        require(index < registeredPlates.length, "Indice fuera de rango");
+        return registeredPlates[index];
+    }
+
+    function getVehicleType(string memory _plate) public view returns (VehicleType) {
+        string memory normalizedPlate = toUpper(_plate);
+        require(isValidPlate(normalizedPlate), "Formato invalido");
+
+        bytes32 key = toKey(normalizedPlate);
+        require(bytes(vehicles[key].plate).length != 0, "Vehiculo no existe");
+
+        return vehicles[key].vType;
     }
 
     function getInspectionCount(string memory _plate) public view returns (uint) {

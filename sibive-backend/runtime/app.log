@@ -1,50 +1,9 @@
-2026-06-01 16:55:41,707 [INFO] Inicializando aplicación. Verificando despliegue del contrato...
-2026-06-01 16:55:41,707 [INFO] Esperando a que Geth esté disponible...
-2026-06-01 16:55:41,709 [INFO] Conectado a Geth.
-2026-06-01 16:55:41,709 [INFO] Esperando a que Geth empiece a minar...
-2026-06-01 16:55:43,716 [INFO] Cargando VehicleInspection precompilado...
-2026-06-01 16:55:43,728 [INFO] Transacción enviada: 0xe105bef10ffefb621394a3c9459649b1a93da3bc1c502114eef6e0514f3a4f7b. Esperando confirmación...
-2026-06-01 16:55:47,079 [INFO] Contrato desplegado en: 0x754352a886784C120Af12B55EA8160b1C0C52546
-2026-06-01 16:55:47,079 [INFO] Guardado /app/runtime/contract_info.json.
-2026-06-01 16:57:29,507 [ERROR] Error inesperado al registrar vehículo (AAA111)
-Traceback (most recent call last):
-  File "/app/routes.py", line 18, in create_vehicle
-    register_vehicle(plate, vtype)
-  File "/app/contract.py", line 124, in register_vehicle
-    tx = _build_tx(contract.functions.registerVehicle(plate, int(vtype)))
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/app/contract.py", line 116, in _build_tx
-    return function_call.build_transaction({
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/web3/contract/contract.py", line 354, in build_transaction
-    return build_transaction_for_function(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/web3/contract/utils.py", line 232, in build_transaction_for_function
-    prepared_transaction = fill_transaction_defaults(w3, prepared_transaction)
-                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "cytoolz/functoolz.pyx", line 289, in cytoolz.functoolz.curry.__call__
-  File "/usr/local/lib/python3.11/site-packages/web3/_utils/transactions.py", line 132, in fill_transaction_defaults
-    default_val = default_getter(w3, transaction)
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/web3/_utils/transactions.py", line 72, in <lambda>
-    "gas": lambda w3, tx: w3.eth.estimate_gas(tx),
-                          ^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/web3/eth/eth.py", line 293, in estimate_gas
-    return self._estimate_gas(transaction, block_identifier)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/web3/module.py", line 75, in caller
-    result = w3.manager.request_blocking(
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/web3/manager.py", line 325, in request_blocking
-    return self.formatted_response(
-           ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/site-packages/web3/manager.py", line 286, in formatted_response
-    apply_error_formatters(error_formatters, response)
-  File "/usr/local/lib/python3.11/site-packages/web3/manager.py", line 103, in apply_error_formatters
-    formatted_resp = pipe(response, error_formatters)
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "cytoolz/functoolz.pyx", line 706, in cytoolz.functoolz.pipe
-  File "cytoolz/functoolz.pyx", line 681, in cytoolz.functoolz.c_pipe
-  File "/usr/local/lib/python3.11/site-packages/web3/_utils/contract_error_handling.py", line 161, in raise_contract_logic_error_on_revert
-    raise ContractLogicError(message, data=data)
-web3.exceptions.ContractLogicError: execution reverted: Vehiculo ya existe
+2026-06-01 20:09:04,185 [INFO] Inicializando aplicación. Verificando despliegue del contrato...
+2026-06-01 20:09:04,186 [INFO] Esperando a que Geth esté disponible...
+2026-06-01 20:09:04,188 [INFO] Conectado a Geth.
+2026-06-01 20:09:04,188 [INFO] Esperando a que Geth empiece a minar...
+2026-06-01 20:09:05,202 [INFO] Cargando VehicleInspection precompilado...
+2026-06-01 20:09:05,226 [INFO] Transacción enviada: 0xc9004b1e6b7ddc63e9663e928ae9c597b798390b342a2c81e090a4f1c293928c. Esperando confirmación...
+2026-06-01 20:09:09,096 [INFO] Contrato desplegado en: 0x754352a886784C120Af12B55EA8160b1C0C52546
+2026-06-01 20:09:09,097 [INFO] Guardado /app/runtime/contract_info.json.
+2026-06-01 20:09:20,536 [ERROR] Error al consultar tipo (AAA111): El vehículo no está registrado. Regístrelo primero.

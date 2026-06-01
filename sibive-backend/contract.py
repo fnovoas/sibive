@@ -45,7 +45,7 @@ def _wait_for_mining(timeout=120):
         time.sleep(1)
 
     raise ContractError(
-        "Geth no está minando. Ejecuta 'make mine' antes de usar la aplicación."
+        "Geth no está minando. Ejecute 'make mine' antes de usar la aplicación."
     )
 
 
@@ -62,6 +62,18 @@ def _contract_error_from_message(message):
         return ContractError("El vehículo no está registrado. Regístrelo primero.")
     if "Formato invalido" in text:
         return ContractError("Placa inválida. Use el formato AAA000.")
+    if "Opacidad no registrada para gasolina" in text:
+        return ContractError("Vehículo de gasolina: no se registra opacidad.")
+    if "CO no registrado para diésel" in text:
+        return ContractError("Vehículo diésel: no se registra CO.")
+    if "HC no registrado para diésel" in text:
+        return ContractError("Vehículo diésel: no se registra HC.")
+    if "CO invalido" in text:
+        return ContractError("CO inválido. Rango permitido: 0-1000.")
+    if "HC invalido" in text:
+        return ContractError("HC inválido. Rango permitido: 0-2000.")
+    if "Opacidad invalida" in text:
+        return ContractError("Opacidad inválida. Rango permitido: 0-10000.")
     if "nonce too low" in text:
         return ContractError(
             "Conflicto de nonce en la blockchain. Espere unos segundos e intente de nuevo."
@@ -125,17 +137,98 @@ def register_vehicle(plate, vtype):
     return _send_transaction(tx)
 
 
+VEHICLE_GASOLINE = 0
+VEHICLE_DIESEL = 1
+
+VEHICLE_TYPE_LABELS = {
+    VEHICLE_GASOLINE: "gasolina",
+    VEHICLE_DIESEL: "diesel",
+}
+
+
+def get_vehicle_type(plate):
+    try:
+        return int(contract.functions.getVehicleType(plate).call())
+    except Exception as e:
+        _raise_if_contract_error(e)
+        raise ContractError(
+            "No se pudo consultar el tipo de vehículo."
+        ) from e
+
+
+def get_vehicle_type_info(plate):
+    vtype = get_vehicle_type(plate)
+    label = VEHICLE_TYPE_LABELS.get(vtype)
+
+    if label is None:
+        raise ContractError("Tipo de vehículo no válido en la blockchain.")
+
+    if vtype == VEHICLE_GASOLINE:
+        fields = ["co", "hc"]
+    else:
+        fields = ["opacity"]
+
+    return {
+        "type": vtype,
+        "label": label,
+        "fields": fields,
+    }
+
+
+def _normalize_inspection_values(plate, co, hc, opacity):
+    vtype = get_vehicle_type(plate)
+    co = int(co)
+    hc = int(hc)
+    opacity = int(opacity)
+
+    if vtype == VEHICLE_GASOLINE:
+        if opacity != 0:
+            raise ContractError(
+                "Vehículo de gasolina: no se registra opacidad (use 0)."
+            )
+        if not (0 <= co <= 1000):
+            raise ContractError("CO inválido. Rango permitido: 0-1000.")
+        if not (0 <= hc <= 2000):
+            raise ContractError("HC inválido. Rango permitido: 0-2000.")
+    elif vtype == VEHICLE_DIESEL:
+        if co != 0:
+            raise ContractError("Vehículo diésel: no se registra CO (use 0).")
+        if hc != 0:
+            raise ContractError("Vehículo diésel: no se registra HC (use 0).")
+        if not (0 <= opacity <= 10000):
+            raise ContractError("Opacidad inválida. Rango permitido: 0-10000.")
+    else:
+        raise ContractError("Tipo de vehículo no válido.")
+
+    return co, hc, opacity
+
+
 def add_inspection(plate, co, hc, opacity):
+    co, hc, opacity = _normalize_inspection_values(plate, co, hc, opacity)
+
     tx = _build_tx(
         contract.functions.addInspection(
             plate,
             int(time.time()),
-            int(co),
-            int(hc),
-            int(opacity),
+            co,
+            hc,
+            opacity,
         )
     )
     return _send_transaction(tx)
+
+
+def _format_inspection(plate, data):
+    approved = data[4]
+    return {
+        "plate": plate,
+        "date": data[0],
+        "co": data[1],
+        "hc": data[2],
+        "opacity": data[3],
+        "approved": approved,
+        "isContaminant": not approved,
+    }
 
 
 def get_inspections(plate):
@@ -151,15 +244,18 @@ def get_inspections(plate):
 
     for i in range(count):
         data = contract.functions.getInspection(plate, i).call()
-        approved = data[4]
+        result.append(_format_inspection(plate, data))
 
-        result.append({
-            "date": data[0],
-            "co": data[1],
-            "hc": data[2],
-            "opacity": data[3],
-            "approved": approved,
-            "isContaminant": not approved,
-        })
+    return result
 
+
+def get_all_inspections():
+    result = []
+    vehicle_count = contract.functions.getRegisteredVehicleCount().call()
+
+    for i in range(vehicle_count):
+        plate = contract.functions.getRegisteredPlate(i).call()
+        result.extend(get_inspections(plate))
+
+    result.sort(key=lambda row: row["date"], reverse=True)
     return result

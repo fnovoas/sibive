@@ -1,5 +1,8 @@
 venv/
 node_modules/
+sibive-frontend/node_modules/
+sibive-frontend/.next/
+sibive-frontend/README.md
 .next/
 __pycache__/
 data/

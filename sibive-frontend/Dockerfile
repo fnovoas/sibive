@@ -1,9 +1,9 @@
-FROM node:20
+FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+COPY package*.json .npmrc ./
+RUN npm install --ignore-scripts
 
 COPY . .
 

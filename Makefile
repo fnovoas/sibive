@@ -1,4 +1,4 @@
-.PHONY: up down build clean restart mine stop-mine logs logs-backend compile-contract
+.PHONY: up down build clean restart mine stop-mine logs logs-backend logs-frontend frontend-install compile-contract
 
 # Recompilar bytecode/abi compatible con Geth (EVM Paris, sin PUSH0)
 compile-contract:
@@ -11,6 +11,9 @@ up:
 
 build:
 	docker-compose up --build -d
+
+frontend-install:
+	cd sibive-frontend && npm install --ignore-scripts
 
 down:
 	docker-compose down
@@ -38,3 +41,6 @@ logs:
 
 logs-backend:
 	docker-compose logs -f backend
+
+logs-frontend:
+	docker-compose logs -f frontend

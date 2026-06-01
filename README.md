@@ -71,6 +71,7 @@ Abre el frontend: **http://localhost:3000**
 1. **Registrar vehículo** — placa `AAA000` (3 letras + 3 números), tipo `0` (gasolina) o `1` (diésel).
 2. **Registrar inspección** — misma placa y valores de monóxido de carbono (CO), hidrocarburos (HC) y opacidad del humo.
 3. **Consultar historial** — introduce la placa y verifica las inspecciones guardadas.
+4. **Ver cadena de bloques** — lista de bloques de la red local (más recientes arriba).
 
 Si el vehículo ya existe en la cadena, el backend responde con un mensaje claro (no hace falta volver a registrarlo; pasa directo a inspección).
 
@@ -92,7 +93,8 @@ Si el vehículo ya existe en la cadena, el backend responde con un mensaje claro
 
 - Frontend: http://localhost:3000  
 - Backend: http://localhost:5000  
-- Geth HTTP RPC: http://localhost:8545  
+- API bloques: `GET http://localhost:5000/blocks` (opcional `?limit=N`)  
+- Geth HTTP RPC: http://localhost:8545 (solo uso interno del backend)  
 
 ## Archivos relevantes
 
