@@ -13,18 +13,68 @@
       },
       {
         "internalType": "uint256",
-        "name": "_co",
+        "name": "_coRalenti",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "_hc",
+        "name": "_coCrucero",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_hcRalenti",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_hcCrucero",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_co2Total",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_o2Total",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
         "name": "_opacity",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_tempMotor",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_rpmRalenti",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_rpmCrucero",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bool",
+        "name": "_emiteHumoContinuo",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_fugaEscape",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "_faltaTapon",
+        "type": "bool"
       }
     ],
     "name": "addInspection",
@@ -49,27 +99,77 @@
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "date",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "coRalenti",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "coCrucero",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "hcRalenti",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "hcCrucero",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "co2Total",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "o2Total",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "opacity",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "tempMotor",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "rpmRalenti",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "rpmCrucero",
         "type": "uint256"
       },
       {
         "internalType": "bool",
-        "name": "",
+        "name": "emiteHumoContinuo",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "fugaEscape",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "faltaTapon",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "approved",
         "type": "bool"
       }
     ],
@@ -135,12 +235,22 @@
         "type": "string"
       }
     ],
-    "name": "getVehicleType",
+    "name": "getVehicleInfo",
     "outputs": [
       {
+        "internalType": "string",
+        "name": "plate",
+        "type": "string"
+      },
+      {
         "internalType": "enum VehicleInspection.VehicleType",
-        "name": "",
+        "name": "vType",
         "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "modelYear",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -157,6 +267,11 @@
         "internalType": "enum VehicleInspection.VehicleType",
         "name": "_vType",
         "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_modelYear",
+        "type": "uint256"
       }
     ],
     "name": "registerVehicle",

@@ -30,6 +30,41 @@ account = w3.eth.account.from_key(PRIVATE_KEY)
 
 _tx_lock = threading.Lock()
 
+VEHICLE_GASOLINE = 0
+VEHICLE_DIESEL = 1
+
+VEHICLE_TYPE_LABELS = {
+    VEHICLE_GASOLINE: "gasolina",
+    VEHICLE_DIESEL: "diesel",
+}
+
+GASOLINE_INSPECTION_FIELDS = [
+    "coRalenti",
+    "coCrucero",
+    "hcRalenti",
+    "hcCrucero",
+    "co2Total",
+    "o2Total",
+    "tempMotor",
+    "rpmRalenti",
+    "rpmCrucero",
+    "emiteHumoContinuo",
+    "fugaEscape",
+    "faltaTapon",
+]
+
+DIESEL_INSPECTION_FIELDS = [
+    "opacity",
+    "co2Total",
+    "o2Total",
+    "tempMotor",
+    "rpmRalenti",
+    "rpmCrucero",
+    "emiteHumoContinuo",
+    "fugaEscape",
+    "faltaTapon",
+]
+
 
 class ContractError(Exception):
     pass
@@ -62,16 +97,32 @@ def _contract_error_from_message(message):
         return ContractError("El vehículo no está registrado. Regístrelo primero.")
     if "Formato invalido" in text:
         return ContractError("Placa inválida. Use el formato AAA000.")
-    if "Opacidad no registrada para gasolina" in text:
-        return ContractError("Vehículo de gasolina: no se registra opacidad.")
-    if "CO no registrado para diésel" in text:
-        return ContractError("Vehículo diésel: no se registra CO.")
-    if "HC no registrado para diésel" in text:
-        return ContractError("Vehículo diésel: no se registra HC.")
-    if "CO invalido" in text:
-        return ContractError("CO inválido. Rango permitido: 0-1000.")
-    if "HC invalido" in text:
-        return ContractError("HC inválido. Rango permitido: 0-2000.")
+    if "Año modelo invalido" in text or "Ano modelo invalido" in text:
+        return ContractError("Año modelo inválido. Rango permitido: 1899-2030.")
+    if "Opacidad no aplica para gasolina" in text:
+        return ContractError("Vehículo de gasolina: no se registra opacidad (use 0).")
+    if "CO no aplica para diesel" in text:
+        return ContractError("Vehículo diésel: no se registra CO (use 0).")
+    if "HC no aplica para diesel" in text:
+        return ContractError("Vehículo diésel: no se registra HC (use 0).")
+    if "CO ralenti invalido" in text:
+        return ContractError("CO en ralentí inválido. Rango permitido: 0-1000.")
+    if "CO crucero invalido" in text:
+        return ContractError("CO en crucero inválido. Rango permitido: 0-1000.")
+    if "HC ralenti invalido" in text:
+        return ContractError("HC en ralentí inválido. Rango permitido: 0-2000.")
+    if "HC crucero invalido" in text:
+        return ContractError("HC en crucero inválido. Rango permitido: 0-2000.")
+    if "CO2 invalido" in text:
+        return ContractError("CO₂ total inválido. Rango permitido: 0-2000.")
+    if "O2 invalido" in text:
+        return ContractError("O₂ total inválido. Rango permitido: 0-2500.")
+    if "Temperatura invalida" in text:
+        return ContractError("Temperatura de motor inválida. Rango permitido: 0-120 °C.")
+    if "RPM ralenti invalido" in text:
+        return ContractError("RPM en ralentí inválido. Rango permitido: 0-8000.")
+    if "RPM crucero invalido" in text:
+        return ContractError("RPM en crucero inválido. Rango permitido: 0-8000.")
     if "Opacidad invalida" in text:
         return ContractError("Opacidad inválida. Rango permitido: 0-10000.")
     if "nonce too low" in text:
@@ -132,100 +183,197 @@ def _build_tx(function_call):
     })
 
 
-def register_vehicle(plate, vtype):
-    tx = _build_tx(contract.functions.registerVehicle(plate, int(vtype)))
+def register_vehicle(plate, vtype, model_year):
+    model_year = int(model_year)
+    if not (1899 <= model_year <= 2030):
+        raise ContractError("Año modelo inválido. Rango permitido: 1899-2030.")
+
+    tx = _build_tx(
+        contract.functions.registerVehicle(plate, int(vtype), model_year)
+    )
     return _send_transaction(tx)
 
 
-VEHICLE_GASOLINE = 0
-VEHICLE_DIESEL = 1
-
-VEHICLE_TYPE_LABELS = {
-    VEHICLE_GASOLINE: "gasolina",
-    VEHICLE_DIESEL: "diesel",
-}
-
-
-def get_vehicle_type(plate):
+def get_vehicle_info(plate):
     try:
-        return int(contract.functions.getVehicleType(plate).call())
+        plate_result, vtype, model_year = contract.functions.getVehicleInfo(
+            plate
+        ).call()
     except Exception as e:
         _raise_if_contract_error(e)
         raise ContractError(
-            "No se pudo consultar el tipo de vehículo."
+            "No se pudo consultar la información del vehículo."
         ) from e
+
+    return {
+        "plate": plate_result,
+        "type": int(vtype),
+        "modelYear": int(model_year),
+    }
 
 
 def get_vehicle_type_info(plate):
-    vtype = get_vehicle_type(plate)
+    info = get_vehicle_info(plate)
+    vtype = info["type"]
     label = VEHICLE_TYPE_LABELS.get(vtype)
 
     if label is None:
         raise ContractError("Tipo de vehículo no válido en la blockchain.")
 
     if vtype == VEHICLE_GASOLINE:
-        fields = ["co", "hc"]
+        fields = GASOLINE_INSPECTION_FIELDS
     else:
-        fields = ["opacity"]
+        fields = DIESEL_INSPECTION_FIELDS
 
     return {
         "type": vtype,
         "label": label,
+        "modelYear": info["modelYear"],
         "fields": fields,
     }
 
 
-def _normalize_inspection_values(plate, co, hc, opacity):
-    vtype = get_vehicle_type(plate)
-    co = int(co)
-    hc = int(hc)
-    opacity = int(opacity)
+def get_vehicle_summary(plate):
+    info = get_vehicle_info(plate)
+    label = VEHICLE_TYPE_LABELS.get(info["type"])
+
+    if label is None:
+        raise ContractError("Tipo de vehículo no válido en la blockchain.")
+
+    return {
+        "plate": info["plate"],
+        "type": info["type"],
+        "label": label,
+        "modelYear": info["modelYear"],
+    }
+
+
+def _normalize_inspection_values(plate, values):
+    vtype = get_vehicle_info(plate)["type"]
+
+    co_ralenti = int(values["coRalenti"])
+    co_crucero = int(values["coCrucero"])
+    hc_ralenti = int(values["hcRalenti"])
+    hc_crucero = int(values["hcCrucero"])
+    co2_total = int(values["co2Total"])
+    o2_total = int(values["o2Total"])
+    opacity = int(values["opacity"])
+    temp_motor = int(values["tempMotor"])
+    rpm_ralenti = int(values["rpmRalenti"])
+    rpm_crucero = int(values["rpmCrucero"])
+    emite_humo = bool(values["emiteHumoContinuo"])
+    fuga_escape = bool(values["fugaEscape"])
+    falta_tapon = bool(values["faltaTapon"])
+
+    if not (0 <= co2_total <= 2000):
+        raise ContractError("CO₂ total inválido. Rango permitido: 0-2000.")
+    if not (0 <= o2_total <= 2500):
+        raise ContractError("O₂ total inválido. Rango permitido: 0-2500.")
+    if not (0 <= temp_motor <= 120):
+        raise ContractError("Temperatura de motor inválida. Rango permitido: 0-120 °C.")
+    if not (0 <= rpm_ralenti <= 8000):
+        raise ContractError("RPM en ralentí inválido. Rango permitido: 0-8000.")
+    if not (0 <= rpm_crucero <= 8000):
+        raise ContractError("RPM en crucero inválido. Rango permitido: 0-8000.")
 
     if vtype == VEHICLE_GASOLINE:
         if opacity != 0:
             raise ContractError(
                 "Vehículo de gasolina: no se registra opacidad (use 0)."
             )
-        if not (0 <= co <= 1000):
-            raise ContractError("CO inválido. Rango permitido: 0-1000.")
-        if not (0 <= hc <= 2000):
-            raise ContractError("HC inválido. Rango permitido: 0-2000.")
+        if not (0 <= co_ralenti <= 1000):
+            raise ContractError("CO en ralentí inválido. Rango permitido: 0-1000.")
+        if not (0 <= co_crucero <= 1000):
+            raise ContractError("CO en crucero inválido. Rango permitido: 0-1000.")
+        if not (0 <= hc_ralenti <= 2000):
+            raise ContractError("HC en ralentí inválido. Rango permitido: 0-2000.")
+        if not (0 <= hc_crucero <= 2000):
+            raise ContractError("HC en crucero inválido. Rango permitido: 0-2000.")
     elif vtype == VEHICLE_DIESEL:
-        if co != 0:
+        if co_ralenti != 0 or co_crucero != 0:
             raise ContractError("Vehículo diésel: no se registra CO (use 0).")
-        if hc != 0:
+        if hc_ralenti != 0 or hc_crucero != 0:
             raise ContractError("Vehículo diésel: no se registra HC (use 0).")
         if not (0 <= opacity <= 10000):
             raise ContractError("Opacidad inválida. Rango permitido: 0-10000.")
     else:
         raise ContractError("Tipo de vehículo no válido.")
 
-    return co, hc, opacity
+    return (
+        co_ralenti,
+        co_crucero,
+        hc_ralenti,
+        hc_crucero,
+        co2_total,
+        o2_total,
+        opacity,
+        temp_motor,
+        rpm_ralenti,
+        rpm_crucero,
+        emite_humo,
+        fuga_escape,
+        falta_tapon,
+    )
 
 
-def add_inspection(plate, co, hc, opacity):
-    co, hc, opacity = _normalize_inspection_values(plate, co, hc, opacity)
+def add_inspection(plate, values):
+    normalized = _normalize_inspection_values(plate, values)
+    (
+        co_ralenti,
+        co_crucero,
+        hc_ralenti,
+        hc_crucero,
+        co2_total,
+        o2_total,
+        opacity,
+        temp_motor,
+        rpm_ralenti,
+        rpm_crucero,
+        emite_humo,
+        fuga_escape,
+        falta_tapon,
+    ) = normalized
 
     tx = _build_tx(
         contract.functions.addInspection(
             plate,
             int(time.time()),
-            co,
-            hc,
+            co_ralenti,
+            co_crucero,
+            hc_ralenti,
+            hc_crucero,
+            co2_total,
+            o2_total,
             opacity,
+            temp_motor,
+            rpm_ralenti,
+            rpm_crucero,
+            emite_humo,
+            fuga_escape,
+            falta_tapon,
         )
     )
     return _send_transaction(tx)
 
 
 def _format_inspection(plate, data):
-    approved = data[4]
+    approved = data[14]
     return {
         "plate": plate,
         "date": data[0],
-        "co": data[1],
-        "hc": data[2],
-        "opacity": data[3],
+        "coRalenti": data[1],
+        "coCrucero": data[2],
+        "hcRalenti": data[3],
+        "hcCrucero": data[4],
+        "co2Total": data[5],
+        "o2Total": data[6],
+        "opacity": data[7],
+        "tempMotor": data[8],
+        "rpmRalenti": data[9],
+        "rpmCrucero": data[10],
+        "emiteHumoContinuo": data[11],
+        "fugaEscape": data[12],
+        "faltaTapon": data[13],
         "approved": approved,
         "isContaminant": not approved,
     }

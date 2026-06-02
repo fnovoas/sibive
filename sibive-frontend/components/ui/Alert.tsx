@@ -15,11 +15,11 @@ const styles: Record<AlertVariant, string> = {
 
 export function Alert({ children, variant = "info" }: AlertProps) {
   return (
-    <p
+    <div
       className={`rounded-lg border px-4 py-3 text-sm leading-relaxed ${styles[variant]}`}
       role="alert"
     >
       {children}
-    </p>
+    </div>
   );
 }

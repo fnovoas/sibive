@@ -10,7 +10,7 @@ export default function HomePage() {
     <>
       <PageHeader
         title="Panel principal"
-        description="Gestión de inspecciones vehiculares sobre blockchain privada. Elija una acción del menú lateral o use los accesos rápidos."
+        description="Gestión de inspecciones vehiculares sobre blockchain privada. Aquí podrá realizar las siguientes acciones."
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -18,9 +18,6 @@ export default function HomePage() {
           <Link key={item.href} href={item.href} className="group block">
             <Card className="transition-shadow group-hover:shadow-md">
               <h2 className="font-medium text-brand">{item.label}</h2>
-              <p className="mt-2 text-sm text-muted">
-                Ir a {item.label.toLowerCase()}
-              </p>
             </Card>
           </Link>
         ))}

@@ -10,10 +10,10 @@ export function Sidebar() {
   return (
     <aside className="flex w-64 shrink-0 flex-col bg-brand text-white">
       <div className="border-b border-white/10 px-6 py-6">
-        <p className="text-xs font-medium uppercase tracking-widest text-white/70">
-          Sistema
-        </p>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight">SiBIVe</h1>
+        <Link href="/" className="flex items-center gap-3 text-white no-underline focus:outline-none focus:ring-2 focus:ring-white/40 rounded-lg px-1 py-1">
+          <img src="/favicon.ico" alt="SiBIVe" className="h-6 w-auto" />
+          <h1 className="mt-1 text-xl font-semibold tracking-tight">SiBIVe</h1>
+        </Link>
         <p className="mt-1 text-xs text-white/60">Sistema blockchain para inspección de vehículos</p>
       </div>
 

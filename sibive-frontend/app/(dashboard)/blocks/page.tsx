@@ -13,6 +13,7 @@ export default function BlocksPage() {
   const [data, setData] = useState<BlocksResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filterTxOnly, setFilterTxOnly] = useState(false);
 
   const fetchBlocks = useCallback(async () => {
     setLoading(true);
@@ -36,6 +37,11 @@ export default function BlocksPage() {
     void fetchBlocks();
   }, [fetchBlocks]);
 
+  const visibleBlocks =
+    data?.blocks.filter(
+      (block) => !filterTxOnly || block.transactionCount > 0
+    ) ?? [];
+
   return (
     <>
       <PageHeader
@@ -43,9 +49,16 @@ export default function BlocksPage() {
         description="Bloques de la red local Geth, del más reciente al más antiguo."
       />
 
-      <div className="mb-6">
+      <div className="mb-6 flex flex-wrap gap-2">
         <Button onClick={fetchBlocks} disabled={loading}>
           {loading ? "Cargando…" : "Actualizar"}
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => setFilterTxOnly((current) => !current)}
+          disabled={loading || !data}
+        >
+          {filterTxOnly ? "Ver todos" : "Ver bloques con transacciones"}
         </Button>
       </div>
 
@@ -55,15 +68,25 @@ export default function BlocksPage() {
         <>
           <p className="mb-4 text-sm text-muted">
             Altura actual: <strong>{data.latest}</strong> — mostrando{" "}
-            <strong>{data.count}</strong>{" "}
-            {data.count === 1 ? "bloque" : "bloques"}
+            <strong>{visibleBlocks.length}</strong>{" "}
+            {visibleBlocks.length === 1 ? "bloque" : "bloques"}
+            {filterTxOnly && (
+              <>
+                {" "}
+                (con transacciones, de {data.count} en total)
+              </>
+            )}
           </p>
 
-          {data.blocks.length === 0 ? (
-            <Alert>No hay bloques en la cadena.</Alert>
+          {visibleBlocks.length === 0 ? (
+            <Alert>
+              {filterTxOnly
+                ? "No hay bloques con transacciones."
+                : "No hay bloques en la cadena."}
+            </Alert>
           ) : (
             <ol className="space-y-3">
-              {data.blocks.map((block) => (
+              {visibleBlocks.map((block) => (
                 <li key={block.hash}>
                   <Card className="text-sm">
                     <p className="font-semibold text-brand">
@@ -92,7 +115,7 @@ export default function BlocksPage() {
                       </div>
                     </dl>
                     <p className="mt-2 break-all text-xs text-muted">
-                      Minero: {block.miner}
+                      Firmante: {block.miner}
                     </p>
                   </Card>
                 </li>

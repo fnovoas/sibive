@@ -4,6 +4,8 @@ Proyecto del curso de Ciberseguridad (2026-1) basado en el laboratorio de blockc
 
 DApp para el registro y seguimiento de inspecciones vehiculares sobre una blockchain privada Ethereum (Geth). El entorno es autocontenido: ya no requiere MetaMask ni Remix.
 
+<img src="sibive-frontend/public/screenshot.png" alt="Captura de pantalla de SiBIVe" width="960" height="540" />
+
 ## Componentes
 
 | Capa | Tecnología |
@@ -27,7 +29,14 @@ El backend:
 2. Guarda dirección y ABI en `sibive-backend/runtime/contract_info.json` (volumen persistente).
 3. Firma transacciones en memoria (`sign_transaction` + `send_raw_transaction`) con la cuenta de laboratorio; no usa MetaMask.
 
-Geth mina bloques al iniciar (`--mine` en `geth-node/start_geth_node.sh`).
+Geth mina bloques al iniciar (`--mine` y `--miner.etherbase` en `geth-node/start_geth_node.sh`). En redes Clique (PoA), el campo `miner` del header suele ser `0x0`; la API de bloques expone el **firmante** real vía `clique_getSigner`.
+
+## Contrato `VehicleInspection`
+
+- **Vehículo:** placa `AAA000`, tipo (`0` gasolina / `1` diésel), año del modelo.
+- **Inspección:** gases en ralentí/crucero (gasolina), opacidad (diésel), CO₂/O₂, temperatura y RPM de prueba, y defectos de rechazo directo (humo continuo, fuga de escape, falta de tapón/filtro).
+- **Aprobación on-chain:** rechazo directo → condiciones de prueba (temp. ≥ 60 °C, RPM en rangos) → criterio de dilución → límites de CO/HC u opacidad según **año modelo** del vehículo.
+- Valores decimales en cadena como enteros (p. ej. `1,0 %` de CO → `100`).
 
 ## Cuenta de laboratorio
 
@@ -68,12 +77,26 @@ Abre el frontend: **http://localhost:3000**
 
 ### Flujo en la aplicación
 
-1. **Registrar vehículo** — placa `AAA000` (3 letras + 3 números), tipo `0` (gasolina) o `1` (diésel).
-2. **Registrar inspección** — misma placa y valores de monóxido de carbono (CO), hidrocarburos (HC) y opacidad del humo.
-3. **Consultar historial** — introduce la placa y verifica las inspecciones guardadas.
-4. **Ver cadena de bloques** — lista de bloques de la red local (más recientes arriba).
+1. **Registrar vehículo** (`/register`) — placa `AAA000`, tipo de combustible y año modelo.
+2. **Consultar vehículo** (`/query`) — consulta por placa: tipo de combustible y año modelo.
+3. **Registrar inspección** (`/inspection`) — placa ya registrada; el formulario se adapta a gasolina o diésel. Incluye atajos para rellenar valores normales, máximos permitidos o limpiar campos.
+4. **Historial de inspecciones** (`/history`) — listado global; filtro por placa y por contaminante.
+5. **Cadena de bloques** (`/blocks`) — bloques locales (más recientes arriba), con dirección del firmante Clique.
 
 Si el vehículo ya existe en la cadena, el backend responde con un mensaje claro (no hace falta volver a registrarlo; pasa directo a inspección).
+
+## API REST (backend)
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/` | Estado del API |
+| `POST` | `/vehicle` | Registrar vehículo (`plate`, `type`, `modelYear`) |
+| `GET` | `/vehicle/<plate>/info` | Tipo y año modelo |
+| `GET` | `/vehicle/<plate>/type` | Tipo, año modelo y campos de inspección aplicables |
+| `GET` | `/vehicle/<plate>` | Inspecciones del vehículo |
+| `POST` | `/inspection` | Registrar inspección (todos los campos del contrato) |
+| `GET` | `/inspections` | Todas las inspecciones |
+| `GET` | `/blocks` | Bloques (`?limit=N` opcional) |
 
 ## Comandos Makefile
 
@@ -83,10 +106,13 @@ Si el vehículo ya existe en la cadena, el backend responde con un mensaje claro
 | `make up` | Levanta servicios (sin reconstruir) |
 | `make down` | Detiene contenedores |
 | `make clean` | Detiene servicios, borra cadena local y `contract_info.json` |
+| `make restart` | `clean` + `build` (usa `sudo` en `clean`; ver solución de problemas) |
 | `make mine` | Inicia el minero manualmente (opcional; Geth ya mina con `--mine`) |
 | `make stop-mine` | Detiene el minero |
 | `make logs` | Logs de todos los servicios |
 | `make logs-backend` | Logs del backend (despliegue, API, errores) |
+| `make logs-frontend` | Logs del frontend |
+| `make frontend-install` | `npm install` en `sibive-frontend` (desarrollo fuera de Docker) |
 | `make compile-contract` | Recompila `bytecode.txt` y `abi.json` desde `VehicleInspection.sol` |
 
 ## URLs
@@ -105,6 +131,7 @@ Si el vehículo ya existe en la cadena, el backend responde con un mensaje claro
 | `sibive-backend/runtime/contract_info.json` | Dirección desplegada + ABI (generado al arrancar) |
 | `sibive-backend/runtime/app.log` | Registro de errores y eventos del backend |
 | `geth-node/data/` | Datos persistentes de la blockchain (bind mount) |
+| `scripts/extract_solc.py` | Extrae bytecode/ABI tras `make compile-contract` |
 
 Para regenerar bytecode/ABI tras cambiar el `.sol`:
 
@@ -113,7 +140,7 @@ make compile-contract
 make build
 ```
 
-El bytecode debe compilarse con **EVM Paris** (sin opcode `PUSH0`). El target `compile-contract` ya usa `solc 0.8.19` con `--evm-version paris`.
+El bytecode debe compilarse con **EVM Paris** (sin opcode `PUSH0`). El target `compile-contract` usa `solc 0.8.19` con `--evm-version paris` y `--via-ir` (necesario por el tamaño del contrato). El Makefile preprocesa una copia en `.build/` (sin NatSpec y con literales ASCII) para que `solc` compile sin errores de caracteres Unicode.
 
 ## Solución de problemas
 
@@ -168,9 +195,4 @@ En la consola de Geth: `miner.start()`. Este flujo es **opcional**; el stack Doc
 - `geth-node/data/` se excluye del contexto de build (`.dockerignore`) para no empaquetar la cadena en la imagen; los datos viven en el host vía volumen.
 - Las transacciones fallidas o revertidas no se reportan como éxito: el API valida el recibo on-chain y devuelve mensajes de error al frontend.
 - `make mine` sigue disponible por si detenemos el minero con `make stop-mine`; en el arranque normal no es obligatorio.
-
-## Mejoras futuras
-
-- Integrar Hardhat o Foundry en el pipeline de compilación y pruebas.
-- Dashboard visual más completo.
-- Rotación o externalización de claves para entornos no locales.
+- En `/blocks`, el campo mostrado como firmante proviene de `clique_getSigner`, no del `miner` del header (habitualmente cero en Clique).

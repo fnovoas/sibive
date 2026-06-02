@@ -5,10 +5,27 @@ from contract import (
     get_inspections,
     get_all_inspections,
     get_vehicle_type_info,
+    get_vehicle_summary,
     ContractError,
 )
 from blockchain import get_blocks
 from logger import logger
+
+INSPECTION_FIELDS = [
+    "coRalenti",
+    "coCrucero",
+    "hcRalenti",
+    "hcCrucero",
+    "co2Total",
+    "o2Total",
+    "opacity",
+    "tempMotor",
+    "rpmRalenti",
+    "rpmCrucero",
+    "emiteHumoContinuo",
+    "fugaEscape",
+    "faltaTapon",
+]
 
 
 def register_routes(app):
@@ -18,12 +35,15 @@ def register_routes(app):
         data = request.json or {}
         plate = data.get("plate", "").strip().upper()
         vtype = data.get("type")
+        model_year = data.get("modelYear", data.get("model_year"))
 
         if vtype is None:
             return jsonify({"error": "Falta el tipo de vehículo"}), 400
+        if model_year is None:
+            return jsonify({"error": "Falta el año modelo"}), 400
 
         try:
-            register_vehicle(plate, vtype)
+            register_vehicle(plate, vtype, model_year)
             return jsonify({"message": "Vehículo registrado"})
         except ContractError as e:
             logger.error("Error al registrar vehículo (%s): %s", plate, e)
@@ -40,16 +60,15 @@ def register_routes(app):
         data = request.json or {}
         plate = data.get("plate", "").strip().upper()
 
+        missing = [field for field in INSPECTION_FIELDS if field not in data]
+        if missing:
+            return jsonify({
+                "error": f"Faltan campos: {', '.join(missing)}"
+            }), 400
+
         try:
-            add_inspection(
-                plate,
-                data["co"],
-                data["hc"],
-                data["opacity"],
-            )
+            add_inspection(plate, {field: data[field] for field in INSPECTION_FIELDS})
             return jsonify({"message": "Inspección registrada"})
-        except KeyError as e:
-            return jsonify({"error": f"Falta el campo {e.args[0]}"}), 400
         except ContractError as e:
             logger.error("Error al registrar inspección (%s): %s", plate, e)
             return jsonify({"error": str(e)}), 400
@@ -69,6 +88,19 @@ def register_routes(app):
             return jsonify({"error": str(e)}), 400
         except Exception as e:
             logger.exception("Error inesperado al listar inspecciones")
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/vehicle/<plate>/info", methods=["GET"])
+    def vehicle_info(plate):
+        plate = plate.strip().upper()
+
+        try:
+            return jsonify(get_vehicle_summary(plate))
+        except ContractError as e:
+            logger.error("Error al consultar vehículo (%s): %s", plate, e)
+            return jsonify({"error": str(e)}), 400
+        except Exception as e:
+            logger.exception("Error inesperado al consultar vehículo (%s)", plate)
             return jsonify({"error": str(e)}), 500
 
     @app.route("/vehicle/<plate>/type", methods=["GET"])

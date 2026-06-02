@@ -9,17 +9,7 @@ contract VehicleInspection {
 
     enum VehicleType { Gasoline, Diesel }
 
-    /**
-     * CODIFICACIÓN DE VALORES DECIMALES COMO ENTEROS:
-     *
-     * co_ralenti, co_crucero  : % * 100   (ej: 1.0%  → 100,  3.5%  → 350 )
-     * hc_ralenti, hc_crucero  : ppm * 1   (ej: 200 ppm → 200            )
-     * co2Total                : % * 100   (ej: 11.0% → 1100             )
-     * o2Total                 : % * 100   (ej: 5.0%  → 500              )
-     * opacity                 : % * 100   (ej: 20.0% → 2000             )
-     * tempMotor               : °C * 1    (ej: 60°C  → 60               )
-     * rpmRalenti, rpmCrucero  : rpm * 1   (ej: 800   → 800              )
-     */
+    
     struct Inspection {
         uint date;
 
@@ -94,11 +84,7 @@ contract VehicleInspection {
     // LÓGICA DE APROBACIÓN
     // =========================================================
 
-    /**
-     * @dev Determina si la inspección aprueba (no contamina).
-     *      Sigue el orden: rechazo directo → bloqueo de prueba →
-     *      dilución → límites de gases/opacidad según año modelo.
-     */
+    
     function isApproved(
         VehicleType    _vType,
         uint           _modelYear,
@@ -191,12 +177,7 @@ contract VehicleInspection {
     // FUNCIONES PRINCIPALES
     // =========================================================
 
-    /**
-     * @notice Registra un vehículo nuevo.
-     * @param _plate      Placa en formato AAA000 (mayúsculas o minúsculas).
-     * @param _vType      0 = Gasolina, 1 = Diésel.
-     * @param _modelYear  Año modelo del vehículo (ej: 2015).
-     */
+    
     function registerVehicle(
         string memory _plate,
         VehicleType   _vType,
@@ -204,7 +185,7 @@ contract VehicleInspection {
     ) public {
         string memory normalizedPlate = toUpper(_plate);
         require(isValidPlate(normalizedPlate), "Formato invalido");
-        require(_modelYear >= 1899 && _modelYear <= 2030, "Año modelo invalido");
+        require(_modelYear >= 1899 && _modelYear <= 2030, "A?o modelo invalido");
 
         bytes32 key = toKey(normalizedPlate);
         require(bytes(vehicles[key].plate).length == 0, "Vehiculo ya existe");
@@ -215,33 +196,7 @@ contract VehicleInspection {
         registeredPlates.push(normalizedPlate);
     }
 
-    /**
-     * @notice Registra una nueva inspección de emisiones para un vehículo.
-     *
-     * Para vehículos a GASOLINA:
-     *   - opacity debe ser 0 (no aplica).
-     *   - Todos los demás parámetros numéricos son obligatorios.
-     *
-     * Para vehículos DIÉSEL:
-     *   - coRalenti, coCrucero, hcRalenti, hcCrucero deben ser 0 (no aplican).
-     *   - opacity, co2Total, o2Total, tempMotor, rpm sí aplican.
-     *
-     * @param _plate              Placa del vehículo.
-     * @param _date               Fecha Unix de la inspección.
-     * @param _coRalenti          CO en ralentí (% * 100).   Solo gasolina.
-     * @param _coCrucero          CO en crucero (% * 100).   Solo gasolina.
-     * @param _hcRalenti          HC en ralentí (ppm).       Solo gasolina.
-     * @param _hcCrucero          HC en crucero (ppm).       Solo gasolina.
-     * @param _co2Total           CO₂ total (% * 100).
-     * @param _o2Total            O₂ total  (% * 100).
-     * @param _opacity            Opacidad  (% * 100).       Solo diésel.
-     * @param _tempMotor          Temperatura motor (°C).
-     * @param _rpmRalenti         RPM en ralentí.
-     * @param _rpmCrucero         RPM en crucero.
-     * @param _emiteHumoContinuo  Humo continuo visible > 10 s.
-     * @param _fugaEscape         Fuga en el sistema de escape.
-     * @param _faltaTapon         Falta tapón aceite/combustible o filtro de aire.
-     */
+    
     function addInspection(
         string memory _plate,
         uint _date,
@@ -358,13 +313,7 @@ contract VehicleInspection {
         return vehicles[toKey(normalizedPlate)].inspections.length;
     }
 
-    /**
-     * @notice Devuelve todos los campos de una inspección dado su índice.
-     * @return date, coRalenti, coCrucero, hcRalenti, hcCrucero,
-     *         co2Total, o2Total, opacity, tempMotor,
-     *         rpmRalenti, rpmCrucero,
-     *         emiteHumoContinuo, fugaEscape, faltaTapon, approved
-     */
+    
     function getInspection(string memory _plate, uint index)
         public view
         returns (
